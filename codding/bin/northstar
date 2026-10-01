@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+
+import sys
+
+sys.path.insert(0, "/usr/share/northstar")
+
+from northstar.app import main
+
+raise SystemExit(main())

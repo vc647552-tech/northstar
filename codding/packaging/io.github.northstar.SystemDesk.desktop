@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Northstar
+GenericName=System and File Manager
+Comment=Browse files, launch applications, and monitor system health
+Exec=northstar
+Icon=io.github.northstar.SystemDesk
+Terminal=false
+Type=Application
+Categories=System;FileTools;
+Keywords=files;system;monitor;processes;battery;applications;
+StartupNotify=true
