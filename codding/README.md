@@ -6,8 +6,9 @@ launching, and a user-process inspector in one compact window.
 
 ## Features
 
-- Live CPU and memory utilization, battery state, temperature, storage, uptime,
-  and process counts. Sensors not exposed by the machine are shown as unavailable.
+- Separate live CPU, GPU, memory, storage, network throughput, battery, power,
+  and temperature metrics, plus uptime and process counts. Unsupported sensors
+  are shown as unavailable.
 - Browse folders, open files with their desktop default application, create
   folders, and move items to Trash with a confirmation step.
 - Launch installed desktop applications and inspect supported application files
@@ -45,7 +46,7 @@ bash packaging/build-rpm.sh
 The binary RPM is written to `~/rpmbuild/RPMS/noarch/`. Install it with:
 
 ```sh
-sudo dnf install ~/rpmbuild/RPMS/noarch/northstar-0.1.0-1*.noarch.rpm
+sudo dnf install ~/rpmbuild/RPMS/noarch/northstar-0.2.0-1*.noarch.rpm
 ```
 
 Set `RPMBUILD_DIR` to use a different RPM build tree. The spec installs the

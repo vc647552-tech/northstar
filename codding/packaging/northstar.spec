@@ -1,5 +1,5 @@
 Name:           northstar
-Version:        0.1.0
+Version:        0.2.0
 Release:        1%{?dist}
 Summary:        Native desktop file manager and system monitor
 License:        MIT
@@ -46,5 +46,8 @@ install -Dpm 0644 LICENSE %{buildroot}%{_licensedir}/%{name}/LICENSE
 %{_datadir}/icons/hicolor/scalable/apps/io.github.northstar.SystemDesk.svg
 
 %changelog
+* Sun Nov 01 2026 Northstar contributors - 0.2.0-1
+- Add separate CPU, GPU, storage, network, battery, power, and temperature metrics
+
 * Thu Oct 01 2026 Northstar contributors - 0.1.0-1
 - Initial release

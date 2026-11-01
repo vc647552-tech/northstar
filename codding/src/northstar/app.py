@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk, Pango
 
-from northstar.system import format_bytes, format_uptime, snapshot
+from northstar.system import format_bytes, format_rate, format_uptime, snapshot
 
 
 APP_ID = "io.github.northstar.SystemDesk"
@@ -225,17 +225,27 @@ class NorthstarWindow(Adw.ApplicationWindow):
     def _build_overview(self) -> Gtk.Widget:
         page = self._page(19)
         page.append(self._heading("Your system, at a glance", "Live readings from this machine"))
-        grid = Gtk.Grid(column_spacing=12, row_spacing=12)
+        grid = Gtk.FlowBox()
+        grid.set_selection_mode(Gtk.SelectionMode.NONE)
+        grid.set_min_children_per_line(2)
+        grid.set_max_children_per_line(4)
+        grid.set_row_spacing(12)
+        grid.set_column_spacing(12)
+        grid.set_homogeneous(True)
         self.metric_widgets: dict[str, tuple[Gtk.Label, Gtk.Label, Gtk.ProgressBar]] = {}
         definitions = (
-            ("cpu", "Processor", "processor-symbolic", "", ""),
+            ("cpu", "CPU", "processor-symbolic", "", ""),
+            ("gpu", "GPU", "video-display-symbolic", "accent-blue", ""),
             ("memory", "Memory", "memory-symbolic", "accent-blue", ""),
+            ("storage", "Storage", "drive-harddisk-symbolic", "accent-lime", ""),
+            ("network", "Internet / Network", "network-wired-symbolic", "accent-blue", ""),
             ("battery", "Battery", "battery-symbolic", "accent-lime", ""),
             ("power", "Power draw", "weather-clear-symbolic", "accent-orange", ""),
+            ("temperature", "Temperature", "weather-clear-symbolic", "accent-orange", ""),
         )
-        for index, (key, title, icon, accent, _) in enumerate(definitions):
+        for key, title, icon, accent, _ in definitions:
             card, value, detail, progress = self._metric_card(title, icon, accent)
-            grid.attach(card, index % 2, index // 2, 1, 1)
+            grid.append(card)
             self.metric_widgets[key] = (value, detail, progress)
         page.append(grid)
 
@@ -257,8 +267,7 @@ class NorthstarWindow(Adw.ApplicationWindow):
         details.set_size_request(265, -1)
         details.append(self._heading("Machine health"))
         self.health_labels: dict[str, Gtk.Label] = {}
-        for key, title in (("temperature", "Peak temperature"), ("storage", "Home storage"),
-                           ("processes", "Running processes"), ("uptime", "Uptime")):
+        for key, title in (("processes", "Running processes"), ("uptime", "Uptime")):
             line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
             line.append(label(title, "stat-detail"))
             value = label("--", "row-title")
@@ -403,22 +412,63 @@ class NorthstarWindow(Adw.ApplicationWindow):
         memory_percent = float(self.metrics["memory"])
         battery = self.metrics["battery"]
         power = self.metrics["power"]
+        cpu_cores = self.metrics["cpu_cores"]
+        cpu_frequency = self.metrics["cpu_frequency"]
+        gpu_name = self.metrics["gpu_name"]
+        gpu_utilization = self.metrics["gpu_utilization"]
+        gpu_memory_used = self.metrics["gpu_memory_used"]
+        gpu_memory_total = self.metrics["gpu_memory_total"]
+        disk_percent = float(self.metrics["disk"])
+        temperature = self.metrics["temperature"]
+        network_connected = bool(self.metrics["network_connected"])
+        interfaces = self.metrics["network_interfaces"]
+        battery_detail = (
+            "No battery detected" if battery is None else
+            "Charging" if self.metrics["charging"] else
+            "Discharging" if self.metrics["charging"] is False else "Battery state unavailable"
+        )
+        gpu_detail = str(gpu_name or "No GPU detected")
+        if gpu_memory_used is not None and gpu_memory_total:
+            gpu_detail += f" · {format_bytes(int(gpu_memory_used))} / {format_bytes(int(gpu_memory_total))} VRAM"
+        elif gpu_name:
+            gpu_detail += " · VRAM telemetry unavailable"
+        network_detail = (
+            f"↑ {format_rate(float(self.metrics['network_upload']))} · {interfaces or 'Active interface'}"
+            if network_connected else "No active network interface"
+        )
         values = {
-            "cpu": (f"{cpu:.0f}%", "Processor load right now", cpu),
+            "cpu": (
+                f"{cpu:.0f}%",
+                f"{cpu_cores or 'N/A'} logical CPUs · {cpu_frequency:.0f} MHz" if cpu_frequency else f"{cpu_cores or 'N/A'} logical CPUs",
+                cpu,
+            ),
+            "gpu": (
+                f"{gpu_utilization:.0f}%" if gpu_utilization is not None else "N/A",
+                gpu_detail if gpu_utilization is None else f"{gpu_detail} · GPU utilization",
+                float(gpu_utilization or 0),
+            ),
             "memory": (f"{memory_percent:.0f}%", f"{format_bytes(int(self.metrics['memory_used']))} of {format_bytes(int(self.metrics['memory_total']))}", memory_percent),
-            "battery": (f"{battery:.0f}%" if battery is not None else "N/A", "Charging" if self.metrics["charging"] else "On battery or unavailable", float(battery or 0)),
+            "storage": (
+                f"{disk_percent:.0f}%",
+                f"{format_bytes(int(self.metrics['disk_used']))} of {format_bytes(int(self.metrics['disk_total']))} · Home filesystem",
+                disk_percent,
+            ),
+            "network": (
+                f"↓ {format_rate(float(self.metrics['network_download']))}" if network_connected else "Offline",
+                network_detail,
+                0,
+            ),
+            "battery": (f"{battery:.0f}%" if battery is not None else "N/A", battery_detail, float(battery or 0)),
             "power": (str(power or "N/A"), "Live system power telemetry" if power else "Hardware does not expose a power sensor", 0),
+            "temperature": (f"{temperature:.0f} °C" if temperature is not None else "N/A", "Peak available sensor reading", 0),
         }
         for key, (value, detail, fraction) in values.items():
             main_label, sub_label, progress = self.metric_widgets[key]
             main_label.set_text(value)
             sub_label.set_text(detail)
             progress.set_fraction(max(0, min(1, fraction / 100)))
-            progress.set_visible(key != "power")
+            progress.set_visible(key in {"cpu", "gpu", "memory", "storage", "battery"} and (key != "gpu" or gpu_utilization is not None) and (key != "battery" or battery is not None))
 
-        temperature = self.metrics["temperature"]
-        self.health_labels["temperature"].set_text(f"{temperature:.0f} °C" if temperature else "N/A")
-        self.health_labels["storage"].set_text(f"{self.metrics['disk']:.0f}% used")
         self.health_labels["processes"].set_text(str(self.metrics["processes"]))
         self.health_labels["uptime"].set_text(format_uptime(int(self.metrics["uptime"])))
         self.chart.queue_draw()
